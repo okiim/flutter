@@ -1,0 +1,154 @@
+
+
+-- Create database with unique name
+CREATE DATABASE IF NOT EXISTS automated_judging_system;
+USE automated_judging_system;
+
+-- Drop tables in correct order (children first)
+DROP TABLE IF EXISTS judge_competition_assignments;
+DROP TABLE IF EXISTS scores;
+DROP TABLE IF EXISTS criteria;
+DROP TABLE IF EXISTS participants;
+DROP TABLE IF EXISTS judges;
+DROP TABLE IF EXISTS competitions;
+DROP TABLE IF EXISTS event_types;
+
+-- Event Types table
+CREATE TABLE event_types (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL UNIQUE,
+    description TEXT,
+    max_participants INT DEFAULT 50,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- Competitions table
+CREATE TABLE competitions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL UNIQUE,
+    description TEXT NOT NULL,
+    date DATE,
+    event_type_id INT NULL,  
+    status ENUM('active', 'inactive', 'completed') DEFAULT 'active',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (event_type_id) REFERENCES event_types(id) 
+        ON DELETE SET NULL ON UPDATE CASCADE
+);
+
+-- Judges table
+CREATE TABLE judges (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    expertise VARCHAR(255),
+    phone VARCHAR(20),
+    status ENUM('active', 'inactive') DEFAULT 'active',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- Participants table
+CREATE TABLE participants (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    course VARCHAR(255) NOT NULL,
+    competition_id INT NULL,  
+    contact VARCHAR(255),
+    age INT,
+    year_level VARCHAR(50),
+    status ENUM('active', 'inactive') DEFAULT 'active',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (competition_id) REFERENCES competitions(id) 
+        ON DELETE SET NULL
+);
+
+-- Criteria table
+CREATE TABLE criteria (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    max_score INT DEFAULT 100,
+    weight DECIMAL(5,2) DEFAULT 1.00,
+    competition_id INT NULL,  
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (competition_id) REFERENCES competitions(id) 
+        ON DELETE SET NULL,
+    CONSTRAINT check_max_score CHECK (max_score > 0 AND max_score <= 100),
+    CONSTRAINT check_weight CHECK (weight > 0 AND weight <= 10.00)
+);
+
+-- Scores table
+CREATE TABLE scores (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    judge_id INT NOT NULL,
+    participant_id INT NOT NULL,
+    criteria_id INT NOT NULL,
+    score DECIMAL(5,2) NOT NULL,
+    comments TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (judge_id) REFERENCES judges(id) ON DELETE CASCADE,
+    FOREIGN KEY (participant_id) REFERENCES participants(id) ON DELETE CASCADE,
+    FOREIGN KEY (criteria_id) REFERENCES criteria(id) ON DELETE CASCADE,
+    UNIQUE KEY unique_judge_participant_criteria (judge_id, participant_id, criteria_id)
+);
+
+-- Judge Competition Assignments
+CREATE TABLE judge_competition_assignments (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    judge_id INT NOT NULL,
+    competition_id INT NOT NULL,
+    assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (judge_id) REFERENCES judges(id) ON DELETE CASCADE,
+    FOREIGN KEY (competition_id) REFERENCES competitions(id) ON DELETE CASCADE,
+    UNIQUE KEY unique_judge_competition (judge_id, competition_id)
+);
+
+-- =============================================
+-- SAMPLE DATA
+-- =============================================
+
+-- Event Types
+INSERT INTO event_types (name, description, max_participants) VALUES
+('Beauty Pageant', 'Traditional beauty pageant competition with various rounds', 30),
+('Talent Show', 'Showcase of various talents including singing, dancing, and performing arts', 50),
+('Academic Quiz', 'Knowledge-based competition covering various academic subjects', 40),
+('Sports Competition', 'Athletic competitions and sports events', 60),
+('Art Contest', 'Creative arts competition including painting, sculpture, and digital art', 25);
+
+-- Competitions
+INSERT INTO competitions (name, description, date, event_type_id) VALUES
+('Miss University 2024', 'Annual university beauty pageant competition', '2024-12-15', 1),
+('Campus Got Talent', 'Inter-department talent showcase', '2024-11-30', 2),
+('Academic Bowl Championship', 'University-wide academic quiz competition', '2024-12-01', 3),
+('Annual Sports Fest', 'Multi-sport competition between departments', '2024-12-10', 4);
+
+-- Judges
+INSERT INTO judges (name, email, expertise, phone) VALUES
+('Dr. Maria Santos', 'maria.santos@university.edu', 'Performing Arts', '+63917123456'),
+('Prof. Juan Dela Cruz', 'juan.delacruz@university.edu', 'Academic Assessment', '+63918234567'),
+('Ms. Anna Garcia', 'anna.garcia@university.edu', 'Visual Arts', '+63919345678'),
+('Coach Roberto Silva', 'roberto.silva@university.edu', 'Sports and Athletics', '+63920456789');
+
+-- Participants
+INSERT INTO participants (name, course, competition_id, contact, age, year_level) VALUES
+('Sophia Reyes', 'Computer Science', 1, 'sophia.reyes@student.edu', 20, '3rd Year'),
+('Miguel Torres', 'Engineering', 2, 'miguel.torres@student.edu', 21, '4th Year'),
+('Isabella Cruz', 'Psychology', 3, 'isabella.cruz@student.edu', 19, '2nd Year'),
+('Carlos Mendoza', 'Business Administration', 4, 'carlos.mendoza@student.edu', 22, '4th Year'),
+('Anya Villanueva', 'Fine Arts', 1, 'anya.villanueva@student.edu', 20, '3rd Year');
+
+-- Criteria
+INSERT INTO criteria (name, description, max_score, competition_id) VALUES
+('Beauty', 'Overall physical appearance and poise', 100, 1),
+('Intelligence', 'Question and answer portion assessment', 100, 1),
+('Talent Performance', 'Skill demonstration and execution', 100, 2),
+('Stage Presence', 'Confidence and audience engagement', 100, 2),
+('Accuracy', 'Correctness of answers provided', 100, 3),
+('Speed', 'Quickness in responding to questions', 100, 3),
+('Technical Skill', 'Athletic ability and technique', 100, 4),
+('Teamwork', 'Collaboration and team coordination', 100, 4);
