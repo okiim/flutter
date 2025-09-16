@@ -23,4 +23,5 @@ class JudgingSystemApp extends StatelessWidget {
       home: const DashboardPage(),
     );
   }
+
 }
