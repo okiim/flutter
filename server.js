@@ -581,10 +581,19 @@ app.delete('/api/criteria/:id', (req, res) => {
     });
 });
 
+// ============= HEALTH CHECK ENDPOINT =============
+app.get("/api/health", (req, res) => {
+    connection.query('SELECT 1', (err, result) => {
+        if (err) {
+            res.status(500).json({ status: "ERROR", message: "Database connection failed", error: err.message });
+        } else {
+            res.json({ status: "OK", message: "Judging System API is running", database: "Connected to ajs_info" });
+        }
+    });
+});
 
-
-//serrver
-app.listen(PORT,  () => {
+// Listen on all interfaces
+app.listen(PORT, '0.0.0.0', () => {
     console.log(`=================================`);
     console.log(`Server running on port ${PORT}`);
     console.log(`Local: http://localhost:${PORT}`);
