@@ -1,229 +1,174 @@
 import 'package:flutter/material.dart';
 import 'api_service.dart';
 
-class EventTypesPage extends StatefulWidget {
-  const EventTypesPage({super.key});
+class JudgesPage extends StatefulWidget {
+  const JudgesPage({super.key});
 
   @override
-  State<EventTypesPage> createState() => _EventTypesPageState();
+  State<JudgesPage> createState() => _JudgesPageState();
 }
 
-class _EventTypesPageState extends State<EventTypesPage>
-    with SingleTickerProviderStateMixin {
-  // =============================================================================
-  // CONSTANTS & CONTROLLERS
-  // =============================================================================
+class _JudgesPageState extends State<JudgesPage> {
+  static const Color primaryColor = Color(0xFF8B1538);
+  static const Color successColor = Color(0xFF4CAF50);
+  static const Color errorColor = Color(0xFFF44336);
+  static const Color infoColor = Color(0xFF2196F3);
 
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
-  final _descriptionController = TextEditingController();
-  late AnimationController _animationController;
-  late Animation<double> _fadeAnimation;
-
-  // =============================================================================
-  // STATE VARIABLES
-  // =============================================================================
-
-  List<EventType> _eventTypes = [];
+  final _emailController = TextEditingController();
+  final _expertiseController = TextEditingController();
+  final _phoneController = TextEditingController();
+  
+  List<Map<String, dynamic>> _judges = [];
   bool _isLoading = false;
-  bool _isSubmitting = false;
   int? _editingId;
-  String _searchQuery = '';
 
   @override
   void initState() {
     super.initState();
-    _initializeAnimations();
-    _loadEventTypes();
+    print('JudgesPage initialized');
+    _loadJudges();
   }
 
   @override
   void dispose() {
-    _animationController.dispose();
     _nameController.dispose();
-    _descriptionController.dispose();
+    _emailController.dispose();
+    _expertiseController.dispose();
+    _phoneController.dispose();
     super.dispose();
   }
 
-  // =============================================================================
-  // INITIALIZATION
-  // =============================================================================
-
-  void _initializeAnimations() {
-    _animationController = AnimationController(
-      duration: const Duration(milliseconds: 600),
-      vsync: this,
-    );
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
-    );
-    _animationController.forward();
-  }
-
-  // =============================================================================
-  // DATA MANAGEMENT
-  // =============================================================================
-
-  Future<void> _loadEventTypes() async {
-    if (!mounted) return;
-    
-    setState(() => _isLoading = true);
-    
-    try {
-      final eventTypesData = await ApiService.getEventTypes();
-      final eventTypes = eventTypesData
-          .map((data) => EventType.fromJson(data))
-          .toList();
-      
-      if (mounted) {
-        setState(() {
-          _eventTypes = eventTypes;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        _showMessage('Failed to load event types: ${e.toString()}', isError: true);
-        setState(() => _isLoading = false);
-      }
+  void _safeSetState(VoidCallback fn) {
+    if (mounted) {
+      setState(fn);
     }
   }
 
-  Future<void> _saveEventType() async {
-    if (!_formKey.currentState!.validate() || _isSubmitting) return;
-
-    setState(() => _isSubmitting = true);
-
+  Future<void> _loadJudges() async {
+    print('Loading judges...');
+    _safeSetState(() => _isLoading = true);
     try {
-      final eventTypeData = {
-        'name': _nameController.text.trim(),
-        'description': _descriptionController.text.trim(),
-      };
-
-      final success = _editingId != null
-          ? await ApiService.updateEventType(_editingId!, eventTypeData)
-          : await ApiService.addEventType(eventTypeData);
-
+      final judges = await ApiService.getJudges();
+      print('Loaded ${judges.length} judges');
       if (mounted) {
-        if (success) {
-          _showMessage('Event type ${_editingId != null ? 'updated' : 'created'} successfully!');
-          _clearForm();
-          await _loadEventTypes();
-        } else {
-          _showMessage('Failed to save event type. Please try again.', isError: true);
-        }
+        _safeSetState(() => _judges = judges);
       }
     } catch (e) {
+      print('Error loading judges: $e');
       if (mounted) {
-        _showMessage('An error occurred: ${e.toString()}', isError: true);
+        _showMessage('Failed to load judges', isError: true);
       }
     } finally {
       if (mounted) {
-        setState(() => _isSubmitting = false);
+        _safeSetState(() => _isLoading = false);
       }
     }
   }
-
-  Future<void> _deleteEventType(EventType eventType) async {
-    final confirmed = await _showDeleteConfirmation(eventType.name);
-    if (!confirmed || !mounted) return;
-
-    try {
-      final success = await ApiService.deleteEventType(eventType.id);
-      if (mounted) {
-        if (success) {
-          _showMessage('Event type deleted successfully!');
-          await _loadEventTypes();
-        } else {
-          _showMessage('Failed to delete event type.', isError: true);
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        _showMessage('An error occurred: ${e.toString()}', isError: true);
-      }
-    }
-  }
-
-  // =============================================================================
-  // UI HELPERS
-  // =============================================================================
 
   void _clearForm() {
     _formKey.currentState?.reset();
     _nameController.clear();
-    _descriptionController.clear();
-    setState(() => _editingId = null);
+    _emailController.clear();
+    _expertiseController.clear();
+    _phoneController.clear();
+    _safeSetState(() => _editingId = null);
   }
 
-  void _editEventType(EventType eventType) {
-    setState(() {
-      _editingId = eventType.id;
-      _nameController.text = eventType.name;
-      _descriptionController.text = eventType.description;
+  void _editJudge(Map<String, dynamic> judge) {
+    print('Editing judge: ${judge['name']}');
+    _safeSetState(() {
+      _editingId = judge['id'];
+      _nameController.text = judge['name'] ?? '';
+      _emailController.text = judge['email'] ?? '';
+      _expertiseController.text = judge['expertise'] ?? '';
+      _phoneController.text = judge['phone'] ?? '';
     });
-    
-    // Scroll to form
-    Scrollable.ensureVisible(
-      context,
-      alignment: 0.0,
-      duration: const Duration(milliseconds: 300),
-    );
   }
 
-  List<EventType> get _filteredEventTypes {
-    if (_searchQuery.isEmpty) return _eventTypes;
-    
-    return _eventTypes.where((eventType) {
-      return eventType.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-             eventType.description.toLowerCase().contains(_searchQuery.toLowerCase());
-    }).toList();
+  Future<void> _saveJudge() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    final judgeData = {
+      'name': _nameController.text.trim(),
+      'email': _emailController.text.trim(),
+      'expertise': _expertiseController.text.trim(),
+      'phone': _phoneController.text.trim(),
+      'status': 'active',
+    };
+
+    print('Saving judge: $judgeData');
+
+    try {
+      bool success;
+      if (_editingId != null) {
+        success = await ApiService.updateJudge(_editingId!, judgeData);
+        print('Update result: $success');
+      } else {
+        success = await ApiService.addJudge(judgeData);
+        print('Add result: $success');
+      }
+
+      if (mounted) {
+        if (success) {
+          _showMessage('Judge ${_editingId != null ? 'updated' : 'added'} successfully!');
+          _clearForm();
+          _loadJudges();
+        } else {
+          _showMessage('Failed to save judge. Please try again.', isError: true);
+        }
+      }
+    } catch (e) {
+      print('Error saving judge: $e');
+      if (mounted) {
+        _showMessage('An error occurred. Please try again.', isError: true);
+      }
+    }
   }
 
-  void _showMessage(String message, {bool isError = false}) {
-    if (!mounted) return;
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Icon(
-              isError ? Icons.error_outline : Icons.check_circle_outline,
-              color: Colors.white,
-            ),
-            const SizedBox(width: 12),
-            Expanded(child: Text(message)),
-          ],
-        ),
-        backgroundColor: isError ? Colors.red : Colors.green,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        margin: const EdgeInsets.all(16),
-      ),
-    );
+  Future<void> _deleteJudge(int id, String name) async {
+    final confirmed = await _showDeleteConfirmation(name);
+    if (!confirmed || !mounted) return;
+
+    print('Deleting judge: $name (ID: $id)');
+
+    try {
+      final success = await ApiService.deleteJudge(id);
+      print('Delete result: $success');
+      
+      if (mounted) {
+        if (success) {
+          _showMessage('Judge deleted successfully!');
+          _loadJudges();
+        } else {
+          _showMessage('Failed to delete judge.', isError: true);
+        }
+      }
+    } catch (e) {
+      print('Error deleting judge: $e');
+      if (mounted) {
+        _showMessage('An error occurred. Please try again.', isError: true);
+      }
+    }
   }
 
   Future<bool> _showDeleteConfirmation(String name) async {
+    if (!mounted) return false;
+    
     return await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
-          children: [
-            Icon(Icons.warning_amber_rounded, color: Colors.orange),
-            SizedBox(width: 12),
-            Text('Delete Event Type'),
-          ],
-        ),
-        content: Text('Are you sure you want to delete "$name"? This action cannot be undone.'),
+        title: const Text('Delete Judge'),
+        content: Text('Are you sure you want to delete "$name"?\n\nThis action cannot be undone.'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
+            onPressed: () => Navigator.pop(context, false),
             child: const Text('Cancel'),
           ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: errorColor),
             child: const Text('Delete'),
           ),
         ],
@@ -231,134 +176,69 @@ class _EventTypesPageState extends State<EventTypesPage>
     ) ?? false;
   }
 
-  // =============================================================================
-  // BUILD METHODS
-  // =============================================================================
+  void _showMessage(String message, {bool isError = false}) {
+    if (!mounted) return;
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? errorColor : successColor,
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    print('Building JudgesPage widget');
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
-      body: FadeTransition(
-        opacity: _fadeAnimation,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildPageHeader(),
-              const SizedBox(height: 24),
-              _buildEventTypeForm(),
-              const SizedBox(height: 32),
-              _buildEventTypesList(),
-            ],
-          ),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildPageHeader(),
+            const SizedBox(height: 20),
+            _buildJudgeForm(),
+            const SizedBox(height: 20),
+            Expanded(child: _buildJudgesList()),
+          ],
         ),
       ),
     );
   }
 
   Widget _buildPageHeader() {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            const Color(0xFF8B1538).withOpacity(0.1),
-            const Color(0xFF8B1538).withOpacity(0.05),
-          ],
+    return Row(
+      children: [
+        const Icon(Icons.person, size: 32, color: primaryColor),
+        const SizedBox(width: 12),
+        const Text(
+          'Manage Judges',
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: primaryColor,
+          ),
         ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF8B1538).withOpacity(0.2)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Row(
-            children: [
-              Icon(Icons.category, color: Color(0xFF8B1538), size: 32),
-              SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Event Types Management',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF333333),
-                      ),
-                    ),
-                    Text(
-                      'Create and manage different types of events',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.grey,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+        const Spacer(),
+        Text(
+          '${_judges.length} ${_judges.length == 1 ? 'judge' : 'judges'}',
+          style: const TextStyle(
+            fontSize: 16,
+            color: Colors.grey,
           ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF8B1538).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  '${_eventTypes.length} Event Types',
-                  style: const TextStyle(
-                    color: Color(0xFF8B1538),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              if (_editingId != null)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.edit, size: 12, color: Colors.orange),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Editing Mode',
-                        style: TextStyle(
-                          color: Colors.orange[700],
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
-  Widget _buildEventTypeForm() {
+  Widget _buildJudgeForm() {
     return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      elevation: 3,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(20),
         child: Form(
           key: _formKey,
           child: Column(
@@ -366,49 +246,24 @@ class _EventTypesPageState extends State<EventTypesPage>
             children: [
               Row(
                 children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF8B1538).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      _editingId != null ? Icons.edit : Icons.add,
-                      color: const Color(0xFF8B1538),
-                    ),
+                  Icon(
+                    _editingId != null ? Icons.edit : Icons.add,
+                    color: primaryColor,
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _editingId != null ? 'Edit Event Type' : 'Create New Event Type',
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF333333),
-                          ),
-                        ),
-                        Text(
-                          _editingId != null 
-                              ? 'Update the event type information below'
-                              : 'Fill in the details to create a new event type',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey,
-                          ),
-                        ),
-                      ],
+                  const SizedBox(width: 8),
+                  Text(
+                    _editingId != null ? 'Edit Judge' : 'Add New Judge',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
               _buildFormFields(),
-              const SizedBox(height: 24),
-              _buildFormActions(),
+              const SizedBox(height: 20),
+              _buildFormButtons(),
             ],
           ),
         ),
@@ -418,340 +273,315 @@ class _EventTypesPageState extends State<EventTypesPage>
 
   Widget _buildFormFields() {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Event Type Name',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF333333),
-          ),
-        ),
-        const SizedBox(height: 8),
+        // Name field
         TextFormField(
           controller: _nameController,
           decoration: const InputDecoration(
-            hintText: 'e.g., Beauty Pageant, Talent Show, Academic Quiz',
-            prefixIcon: Icon(Icons.title),
+            border: OutlineInputBorder(),
+            labelText: 'Judge Name*',
+            hintText: 'Enter judge full name',
+            prefixIcon: Icon(Icons.person_outline),
           ),
           validator: (value) {
             if (value == null || value.trim().isEmpty) {
-              return 'Please enter an event type name';
+              return 'Please enter judge name';
             }
             if (value.trim().length < 2) {
-              return 'Name must be at least 2 characters long';
+              return 'Name must be at least 2 characters';
             }
             return null;
           },
-          textInputAction: TextInputAction.next,
         ),
-        const SizedBox(height: 20),
-        const Text(
-          'Description',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF333333),
-          ),
-        ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 15),
+        
+        // Email field
         TextFormField(
-          controller: _descriptionController,
-          maxLines: 4,
+          controller: _emailController,
+          keyboardType: TextInputType.emailAddress,
           decoration: const InputDecoration(
-            hintText: 'Describe what this event type is about, its purpose, and any special characteristics...',
-            prefixIcon: Icon(Icons.description),
-            alignLabelWithHint: true,
+            border: OutlineInputBorder(),
+            labelText: 'Email Address*',
+            hintText: 'Enter email address',
+            prefixIcon: Icon(Icons.email_outlined),
           ),
-          textInputAction: TextInputAction.done,
-          onFieldSubmitted: (_) => _saveEventType(),
+          validator: (value) {
+            if (value == null || value.trim().isEmpty) {
+              return 'Please enter email address';
+            }
+            if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+              return 'Please enter a valid email address';
+            }
+            return null;
+          },
+        ),
+        const SizedBox(height: 15),
+        
+        // Row with expertise and phone
+        Row(
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: _expertiseController,
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  labelText: 'Area of Expertise',
+                  hintText: 'e.g., Mathematics, Science',
+                  prefixIcon: Icon(Icons.school_outlined),
+                ),
+              ),
+            ),
+            const SizedBox(width: 15),
+            Expanded(
+              child: TextFormField(
+                controller: _phoneController,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  labelText: 'Phone Number',
+                  hintText: 'Enter phone number',
+                  prefixIcon: Icon(Icons.phone_outlined),
+                ),
+              ),
+            ),
+          ],
         ),
       ],
     );
   }
 
-  Widget _buildFormActions() {
+  Widget _buildFormButtons() {
     return Row(
       children: [
-        ElevatedButton(
-          onPressed: _isSubmitting ? null : _saveEventType,
+        ElevatedButton.icon(
+          onPressed: _saveJudge,
           style: ElevatedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+            backgroundColor: primaryColor,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
           ),
-          child: _isSubmitting
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                  ),
-                )
-              : Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(_editingId != null ? Icons.update : Icons.add),
-                    const SizedBox(width: 8),
-                    Text(_editingId != null ? 'Update Event Type' : 'Create Event Type'),
-                  ],
-                ),
+          icon: Icon(_editingId != null ? Icons.update : Icons.add),
+          label: Text(_editingId != null ? 'Update Judge' : 'Add Judge'),
         ),
         if (_editingId != null) ...[
-          const SizedBox(width: 16),
-          OutlinedButton(
-            onPressed: _isSubmitting ? null : _clearForm,
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-            ),
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.cancel_outlined),
-                SizedBox(width: 8),
-                Text('Cancel'),
-              ],
-            ),
+          const SizedBox(width: 12),
+          OutlinedButton.icon(
+            onPressed: _clearForm,
+            icon: const Icon(Icons.cancel_outlined),
+            label: const Text('Cancel'),
           ),
         ],
+        const Spacer(),
+        if (_editingId != null)
+          Text(
+            'Editing: ${_nameController.text}',
+            style: const TextStyle(
+              color: Colors.grey,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
       ],
     );
   }
 
-  Widget _buildEventTypesList() {
+  Widget _buildJudgesList() {
     return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      elevation: 3,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildListHeader(),
-          if (_isLoading) _buildLoadingIndicator(),
-          if (!_isLoading && _filteredEventTypes.isEmpty) _buildEmptyState(),
-          if (!_isLoading && _filteredEventTypes.isNotEmpty) _buildEventTypeItems(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildListHeader() {
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Row(
-            children: [
-              Icon(Icons.list, color: Color(0xFF8B1538)),
-              SizedBox(width: 12),
-              Text(
-                'Existing Event Types',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF333333),
-                ),
-              ),
-            ],
-          ),
-          if (_eventTypes.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            TextField(
-              decoration: InputDecoration(
-                hintText: 'Search event types...',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () => setState(() => _searchQuery = ''),
-                      )
-                    : null,
-                isDense: true,
-              ),
-              onChanged: (value) => setState(() => _searchQuery = value),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLoadingIndicator() {
-    return const Padding(
-      padding: EdgeInsets.all(48),
-      child: Center(
-        child: Column(
-          children: [
-            CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8B1538)),
-            ),
-            SizedBox(height: 16),
-            Text(
-              'Loading event types...',
-              style: TextStyle(color: Colors.grey),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return Padding(
-      padding: const EdgeInsets.all(48),
-      child: Center(
-        child: Column(
-          children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: Colors.grey[100],
-                borderRadius: BorderRadius.circular(40),
-              ),
-              child: const Icon(
-                Icons.category_outlined,
-                size: 40,
-                color: Colors.grey,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              _eventTypes.isEmpty ? 'No event types yet' : 'No matching event types',
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              _eventTypes.isEmpty 
-                  ? 'Create your first event type using the form above'
-                  : 'Try adjusting your search terms',
-              style: const TextStyle(
-                fontSize: 14,
-                color: Colors.grey,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEventTypeItems() {
-    return ListView.separated(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      itemCount: _filteredEventTypes.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 8),
-      itemBuilder: (context, index) {
-        final eventType = _filteredEventTypes[index];
-        final isEditing = _editingId == eventType.id;
-        
-        return AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            color: isEditing ? const Color(0xFF8B1538).withOpacity(0.05) : Colors.white,
-            border: Border.all(
-              color: isEditing ? const Color(0xFF8B1538) : Colors.grey[200]!,
-              width: isEditing ? 2 : 1,
-            ),
-          ),
-          child: ListTile(
-            contentPadding: const EdgeInsets.all(16),
-            leading: Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: const Color(0xFF8B1538).withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(
-                Icons.category,
-                color: Color(0xFF8B1538),
-              ),
-            ),
-            title: Text(
-              eventType.name,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF333333),
-              ),
-            ),
-            subtitle: eventType.description.isNotEmpty
-                ? Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Text(
-                      eventType.description,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey,
-                        height: 1.4,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  )
-                : null,
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Row(
               children: [
-                IconButton(
-                  onPressed: () => _editEventType(eventType),
-                  icon: Icon(
-                    Icons.edit,
-                    color: isEditing ? const Color(0xFF8B1538) : Colors.blue,
+                const Icon(Icons.list, color: primaryColor),
+                const SizedBox(width: 8),
+                const Text(
+                  'Existing Judges',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const Spacer(),
+                if (_isLoading)
+                  const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
                   ),
-                  tooltip: 'Edit Event Type',
-                ),
-                IconButton(
-                  onPressed: () => _deleteEventType(eventType),
-                  icon: const Icon(Icons.delete, color: Colors.red),
-                  tooltip: 'Delete Event Type',
-                ),
               ],
             ),
           ),
-        );
-      },
+          Expanded(
+            child: _isLoading
+                ? const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
+                        ),
+                        SizedBox(height: 16),
+                        Text('Loading judges...'),
+                      ],
+                    ),
+                  )
+                : _judges.isEmpty
+                    ? const Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.person_off, size: 64, color: Colors.grey),
+                            SizedBox(height: 16),
+                            Text(
+                              'No judges found',
+                              style: TextStyle(color: Colors.grey, fontSize: 16),
+                            ),
+                            SizedBox(height: 8),
+                            Text(
+                              'Add your first judge using the form above',
+                              style: TextStyle(color: Colors.grey, fontSize: 14),
+                            ),
+                          ],
+                        ),
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        itemCount: _judges.length,
+                        itemBuilder: (context, index) {
+                          final judge = _judges[index];
+                          return _buildJudgeListItem(judge, index);
+                        },
+                      ),
+          ),
+        ],
+      ),
     );
   }
-}
 
-// =============================================================================
-// DATA MODELS
-// =============================================================================
-
-class EventType {
-  final int id;
-  final String name;
-  final String description;
-
-  const EventType({
-    required this.id,
-    required this.name,
-    required this.description,
-  });
-
-  factory EventType.fromJson(Map<String, dynamic> json) {
-    return EventType(
-      id: json['id'] ?? 0,
-      name: json['name']?.toString() ?? '',
-      description: json['description']?.toString() ?? '',
+  Widget _buildJudgeListItem(Map<String, dynamic> judge, int index) {
+    final isActive = judge['status'] == 'active';
+    final isCurrentlyEditing = _editingId == judge['id'];
+    
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      elevation: isCurrentlyEditing ? 4 : 1,
+      color: isCurrentlyEditing ? primaryColor.withOpacity(0.05) : null,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: isCurrentlyEditing 
+            ? const BorderSide(color: primaryColor, width: 2)
+            : BorderSide.none,
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.all(16),
+        leading: CircleAvatar(
+          backgroundColor: isActive ? primaryColor : Colors.grey,
+          radius: 25,
+          child: Text(
+            (judge['name'] ?? 'J')[0].toUpperCase(),
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 18,
+            ),
+          ),
+        ),
+        title: Row(
+          children: [
+            Expanded(
+              child: Text(
+                judge['name'] ?? 'Unnamed Judge',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: isActive ? Colors.black : Colors.grey,
+                ),
+              ),
+            ),
+            if (!isActive)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.grey.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text(
+                  'Inactive',
+                  style: TextStyle(fontSize: 10, color: Colors.grey),
+                ),
+              ),
+          ],
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                const Icon(Icons.email, size: 14, color: Colors.grey),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    judge['email'] ?? 'No email',
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                ),
+              ],
+            ),
+            if (judge['expertise'] != null && judge['expertise'].toString().isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Row(
+                children: [
+                  const Icon(Icons.school, size: 14, color: Colors.grey),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      'Expertise: ${judge['expertise']}',
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            if (judge['phone'] != null && judge['phone'].toString().isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Row(
+                children: [
+                  const Icon(Icons.phone, size: 14, color: Colors.grey),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      judge['phone'],
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: Icon(
+                Icons.edit,
+                color: isCurrentlyEditing ? primaryColor : infoColor,
+              ),
+              onPressed: () => _editJudge(judge),
+              tooltip: 'Edit Judge',
+            ),
+            IconButton(
+              icon: const Icon(Icons.delete, color: errorColor),
+              onPressed: () => _deleteJudge(
+                judge['id'],
+                judge['name'] ?? 'Unnamed Judge',
+              ),
+              tooltip: 'Delete Judge',
+            ),
+          ],
+        ),
+      ),
     );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'name': name,
-      'description': description,
-    };
   }
 }
